@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "246081489623",
+    "project_id": "workout-lidha-skripsi",
+    "storage_bucket": "workout-lidha-skripsi.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:246081489623:android:eed206bb290617062b3e92",
+        "android_client_info": {
+          "package_name": "com.example.workout_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyChPP9JEMCyjZ3SZbp3wBKMCiWOgdCAS4A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
