@@ -1,8 +1,8 @@
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:http_parser/http_parser.dart'; // Tambah ini untuk identifikasi gambar
 
 class ProfileView extends StatefulWidget {
   const ProfileView({super.key});
@@ -12,20 +12,20 @@ class ProfileView extends StatefulWidget {
 }
 
 class _ProfileViewState extends State<ProfileView> {
-
   File? imageFile;
-
   final currentPassword = TextEditingController();
   final newPassword = TextEditingController();
 
-  // 🔥 TUJUAN WORKOUT
   String selectedGoal = "Penurunan Berat Badan";
-
   final List<String> goals = [
     "Postur & Peregangan Tubuh",
     "Penurunan Berat Badan",
     "Pembentukan Otot",
   ];
+
+  // Silakan sesuaikan baseUrl dengan IP server backend Anda (contoh: localhost / IP lokal laptop)
+  final String baseUrl = "http://10.11.107.226:5000/api/profile/update"; 
+  final int userId = 1; // Contoh id user log-in saat ini, sesuaikan dari Auth State Anda
 
   Future<void> pickImage() async {
     final pickedImage = await ImagePicker().pickImage(
@@ -36,13 +36,77 @@ class _ProfileViewState extends State<ProfileView> {
       setState(() {
         imageFile = File(pickedImage.path);
       });
+      // Opsional: Langsung upload setelah pilih gambar, atau tunggu klik "Simpan Perubahan"
+    }
+  }
+
+  // 🔥 FUNGSI UNTUK KIRIM DATA KE BACKEND
+  Future<void> updateProfileBackend({String? updateGoalOnly}) async {
+    final connect = GetConnect();
+
+    // Buat objek FormData untuk menampung teks & file multipart
+    final formData = FormData({
+      'goal': updateGoalOnly ?? selectedGoal,
+      'current_password': currentPassword.text,
+      'new_password': newPassword.text,
+    });
+
+    // Jika user memilih gambar baru, masukkan ke dalam formData
+    if (imageFile != null && updateGoalOnly == null) {
+      formData.files.add(MapEntry(
+        'image',
+        MultipartFile(
+          imageFile!,
+          filename: imageFile!.path.split('/').last,
+          contentType: 'image/jpeg', // Sesuaikan tipe data gambar
+        ),
+      ));
+    }
+
+    // Tampilkan loading dialog
+    Get.dialog(
+      const Center(child: CircularProgressIndicator()),
+      barrierDismissible: false,
+    );
+
+    try {
+      final response = await connect.post('$baseUrl/$userId', formData);
+      Get.back(); // Tutup loading dialog
+
+      if (response.statusCode == 200) {
+        // Kosongkan field password setelah berhasil
+        currentPassword.clear();
+        newPassword.clear();
+
+        Get.snackbar(
+          "Berhasil",
+          response.body['message'] ?? "Profile berhasil diperbarui",
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+        );
+      } else {
+        Get.snackbar(
+          "Gagal",
+          response.body['message'] ?? "Terjadi kesalahan",
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+      }
+    } catch (e) {
+      Get.back(); // Tutup loading jika error
+      Get.snackbar(
+        "Error",
+        "Tidak dapat terhubung ke server",
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFEBF5FF), // Soft Blue Background matching total
+      backgroundColor: const Color(0xFFEBF5FF),
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
@@ -55,9 +119,7 @@ class _ProfileViewState extends State<ProfileView> {
               Row(
                 children: [
                   GestureDetector(
-                    onTap: () {
-                      Get.back();
-                    },
+                    onTap: () => Get.back(),
                     child: Container(
                       padding: const EdgeInsets.all(10),
                       decoration: const BoxDecoration(
@@ -102,7 +164,7 @@ class _ProfileViewState extends State<ProfileView> {
                       backgroundColor: const Color(0xFF1E293B),
                       backgroundImage: imageFile != null
                           ? FileImage(imageFile!)
-                          : null,
+                          : null, // Note: Bagian ini nanti bisa diarahkan ke NetworkImage dari backend jika data sudah tersimpan
                       child: imageFile == null
                           ? const Icon(
                               Icons.person_rounded,
@@ -135,7 +197,6 @@ class _ProfileViewState extends State<ProfileView> {
               ),
 
               const SizedBox(height: 20),
-
               const Text(
                 "User",
                 style: TextStyle(
@@ -144,9 +205,7 @@ class _ProfileViewState extends State<ProfileView> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-
               const SizedBox(height: 4),
-
               const Text(
                 "Workout Enthusiast 💪",
                 style: TextStyle(
@@ -155,23 +214,13 @@ class _ProfileViewState extends State<ProfileView> {
                   fontWeight: FontWeight.w500,
                 ),
               ),
-
               const SizedBox(height: 35),
 
               // 🔥 INFO PROFILE STATS CARDS
-              profileCard(
-                Icons.monitor_weight_rounded,
-                "Berat Badan",
-                "65 Kg",
-              ),
+              profileCard(Icons.monitor_weight_rounded, "Berat Badan", "65 Kg"),
+              profileCard(Icons.height_rounded, "Tinggi Badan", "170 Cm"),
 
-              profileCard(
-                Icons.height_rounded,
-                "Tinggi Badan",
-                "170 Cm",
-              ),
-
-              // 🔥 TUJUAN WORKOUT CARD DROPDOWN PUTIH PREMIUM
+              // 🔥 TUJUAN WORKOUT CARD DROPDOWN
               Container(
                 width: double.infinity,
                 margin: const EdgeInsets.only(bottom: 12),
@@ -222,14 +271,17 @@ class _ProfileViewState extends State<ProfileView> {
                       decoration: InputDecoration(
                         filled: true,
                         fillColor: const Color(0xFFF8FAFC),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide(color: Colors.black.withOpacity(0.03)),
+                          borderSide: BorderSide(
+                              color: Colors.black.withOpacity(0.03)),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(color: Colors.blueAccent),
+                          borderSide:
+                              const BorderSide(color: Colors.blueAccent),
                         ),
                       ),
                       style: const TextStyle(
@@ -244,27 +296,21 @@ class _ProfileViewState extends State<ProfileView> {
                         );
                       }).toList(),
                       onChanged: (value) {
-                        setState(() {
-                          selectedGoal = value!;
-                        });
-
-                        Get.snackbar(
-                          "Berhasil",
-                          "Tujuan workout diperbarui 💪",
-                          backgroundColor: Colors.green,
-                          colorText: Colors.white,
-                        );
+                        if (value != null) {
+                          setState(() {
+                            selectedGoal = value;
+                          });
+                          // Panggil fungsi API khusus update goal secara realtime saat diganti
+                          updateProfileBackend(updateGoalOnly: value);
+                        }
                       },
                     ),
                   ],
                 ),
               ),
 
-              profileCard(
-                Icons.local_fire_department_rounded,
-                "Kalori Terbakar",
-                "1200 Kcal",
-              ),
+              profileCard(Icons.local_fire_department_rounded,
+                  "Kalori Terbakar", "1200 Kcal"),
 
               const SizedBox(height: 25),
 
@@ -280,37 +326,22 @@ class _ProfileViewState extends State<ProfileView> {
                   ),
                 ),
               ),
-
               const SizedBox(height: 16),
 
-              // PASSWORD FIELDS Putih Bersih
-              passwordField(
-                "Password Lama",
-                currentPassword,
-              ),
-
-              passwordField(
-                "Password Baru",
-                newPassword,
-              ),
+              passwordField("Password Lama", currentPassword),
+              passwordField("Password Baru", newPassword),
 
               const SizedBox(height: 12),
 
-              // 🔥 BUTTON SAVE CHANGES (BLUE ACCENT PREMIUM)
+              // 🔥 BUTTON SAVE CHANGES
               GestureDetector(
                 onTap: () {
-                  Get.snackbar(
-                    "Berhasil",
-                    "Profile berhasil diperbarui",
-                    backgroundColor: Colors.green,
-                    colorText: Colors.white,
-                  );
+                  // Jalankan fungsi update ke backend jika diklik
+                  updateProfileBackend();
                 },
                 child: Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 16,
-                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
                   decoration: BoxDecoration(
                     color: Colors.blueAccent,
                     borderRadius: BorderRadius.circular(20),
@@ -333,7 +364,6 @@ class _ProfileViewState extends State<ProfileView> {
                   ),
                 ),
               ),
-
               const SizedBox(height: 30),
             ],
           ),
@@ -342,12 +372,8 @@ class _ProfileViewState extends State<ProfileView> {
     );
   }
 
-  // 🔥 RE-DESIGN COMPONENT CARD INFO PROFILE
-  Widget profileCard(
-    IconData icon,
-    String title,
-    String value,
-  ) {
+  // Component Card (Tetap sama, diperbaiki sedikit bug BoxShape logic pada shadow)
+  Widget profileCard(IconData icon, String title, String value) {
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 12),
@@ -356,13 +382,11 @@ class _ProfileViewState extends State<ProfileView> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
-          BoxShape.circle == false 
-              ? BoxShadow(
-                  color: Colors.black.withOpacity(0.02),
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
-                )
-              : const BoxShadow(),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          )
         ],
       ),
       child: Row(
@@ -373,11 +397,7 @@ class _ProfileViewState extends State<ProfileView> {
               color: Colors.blueAccent.withOpacity(0.12),
               shape: BoxShape.circle,
             ),
-            child: Icon(
-              icon,
-              color: Colors.blueAccent,
-              size: 22,
-            ),
+            child: Icon(icon, color: Colors.blueAccent, size: 22),
           ),
           const SizedBox(width: 15),
           Expanded(
@@ -403,11 +423,7 @@ class _ProfileViewState extends State<ProfileView> {
     );
   }
 
-  // 🔥 RE-DESIGN COMPONENT PASWORD FIELD PUTIH PREMIUM
-  Widget passwordField(
-    String hint,
-    TextEditingController controller,
-  ) {
+  Widget passwordField(String hint, TextEditingController controller) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: TextField(
@@ -419,15 +435,11 @@ class _ProfileViewState extends State<ProfileView> {
         ),
         decoration: InputDecoration(
           hintText: hint,
-          hintStyle: const TextStyle(
-            color: Colors.black38,
-          ),
+          hintStyle: const TextStyle(color: Colors.black38),
           filled: true,
           fillColor: Colors.white,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 20,
-            vertical: 16,
-          ),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(18),
             borderSide: BorderSide(color: Colors.black.withOpacity(0.03)),

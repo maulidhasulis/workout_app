@@ -72,7 +72,7 @@ class LoginView extends StatelessWidget {
       }
 
       final response = await http.post(
-        Uri.parse("http://192.168.48.21:5000/api/login"),
+        Uri.parse("http://10.11.107.226:5000/api/login"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
           "email": emailController.text,
@@ -89,6 +89,10 @@ class LoginView extends StatelessWidget {
         await prefs.setInt("user_id", data["user"]["id"]);
         await prefs.setString("name", data["user"]["name"]);
         await prefs.setString("goal", data["user"]["goal"]);
+        
+        // 🔥 SIMPAN HEALTH CONDITION KE SHAREDPREFERENCES DI SINI
+        // default nilainya string kosong jika datanya null/tidak ada dari backend
+        await prefs.setString("health_condition", data["user"]["health_condition"] ?? "");
 
         Get.offAll(() => const MenuView());
       } else {
@@ -104,7 +108,7 @@ class LoginView extends StatelessWidget {
     }
   }
 
-  // 🔥 CUSTOM INPUT FIELD BERGAYA CLEAN WHITE (TEXT GELAP & SEGAR)
+  // 櫨 CUSTOM INPUT FIELD BERGAYA CLEAN WHITE (TEXT GELAP & SEGAR)
   Widget buildInputField({
     required String hint,
     required IconData icon,
@@ -143,7 +147,7 @@ class LoginView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFEBF5FF), // Soft Blue Background matching total
+      backgroundColor: const Color(0xFFEBF5FF),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -152,7 +156,6 @@ class LoginView extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // 🔥 LOGO DENGAN EMBEDDED SHADOW BULAT PREMIUM
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
@@ -198,14 +201,12 @@ class LoginView extends StatelessWidget {
 
                 const SizedBox(height: 35),
 
-                // 🔥 EMAIL FIELD
                 buildInputField(
                   hint: "Email",
                   icon: Icons.email_rounded,
                   controller: emailController,
                 ),
 
-                // 🔥 PASSWORD FIELD
                 buildInputField(
                   hint: "Password",
                   icon: Icons.lock_rounded,
@@ -213,7 +214,6 @@ class LoginView extends StatelessWidget {
                   obscureText: true,
                 ),
 
-                // LUPA PASSWORD (TEXT BUTTON ELEGAN)
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
@@ -257,7 +257,6 @@ class LoginView extends StatelessWidget {
 
                 const SizedBox(height: 20),
 
-                // 🔥 TOMBOL LOGIN UTAMA (BLUE ACCENT PREMIUM)
                 Material(
                   color: Colors.transparent,
                   child: InkWell(
@@ -292,7 +291,6 @@ class LoginView extends StatelessWidget {
 
                 const SizedBox(height: 16),
 
-                // 🔥 TOMBOL GOOGLE (WHITE PREMIUM BOX OUTLINE)
                 SizedBox(
                   width: double.infinity,
                   height: 52,
@@ -302,7 +300,6 @@ class LoginView extends StatelessWidget {
                       'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_\"G\"_Logo.svg/24px-Google_\"G\"_Logo.svg.png',
                       height: 20,
                       errorBuilder: (context, error, stackTrace) {
-                        // Fallback jika tidak ada internet saat render icon google asset
                         return const Icon(Icons.g_mobiledata_rounded, color: Colors.blueAccent, size: 28);
                       },
                     ),
@@ -328,7 +325,6 @@ class LoginView extends StatelessWidget {
 
                 const SizedBox(height: 30),
 
-                // TOMBOL KEMBALI
                 GestureDetector(
                   onTap: () => Get.back(),
                   child: const Text(

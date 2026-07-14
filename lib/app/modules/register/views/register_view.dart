@@ -20,6 +20,9 @@ class _RegisterViewState extends State<RegisterView> {
   final password = TextEditingController();
   final tinggi = TextEditingController();
   final berat = TextEditingController();
+  
+  // Kontroler baru untuk mencatat riwayat keluhan/penyakit pengguna
+  final riwayatKesehatan = TextEditingController();
 
   String? selectedGoal;
   String? selectedGender;
@@ -46,12 +49,14 @@ class _RegisterViewState extends State<RegisterView> {
     TextEditingController controller, {
     bool isNumber = false,
     bool isPassword = false,
+    int maxLines = 1, // Ditambahkan agar input riwayat kesehatan bisa lebih panjang
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: TextField(
         controller: controller,
         obscureText: isPassword,
+        maxLines: maxLines,
         keyboardType: isNumber ? TextInputType.number : TextInputType.text,
         style: const TextStyle(
           color: Color(0xFF1E293B),
@@ -132,7 +137,7 @@ class _RegisterViewState extends State<RegisterView> {
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 20,
           vertical: 16,
-        ),
+          ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(color: Colors.black.withOpacity(0.03)),
@@ -161,7 +166,7 @@ class _RegisterViewState extends State<RegisterView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFEBF5FF), // Soft Blue Background matching total
+      backgroundColor: const Color(0xFFEBF5FF),
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
@@ -269,6 +274,16 @@ class _RegisterViewState extends State<RegisterView> {
                 inputField("Berat Badan (kg)", berat, isNumber: true),
               ]),
 
+              // 🔹 MEDICAL ASSESSMENT (FITUR BARU)
+              sectionTitle("KONDISI KESEHATAN / RIWAYAT MEDIS"),
+              cardSection([
+                inputField(
+                  "Tulis riwayat cedera, penyakit, atau keluhan fisik jika ada (Misal: Sakit lutut, Asma, Vertigo, dll). Kosongkan jika sehat.",
+                  riwayatKesehatan,
+                  maxLines: 3, // Agar muat tulisan agak panjang
+                ),
+              ]),
+
               // 🔹 ACTIVITY
               sectionTitle("AKTIVITAS HARIAN"),
               cardSection([
@@ -301,7 +316,7 @@ class _RegisterViewState extends State<RegisterView> {
                   items: activities.map((activity) {
                     return DropdownMenuItem(
                       value: activity,
-                      child: Text(activity),
+                      child: Text(activity)
                     );
                   }).toList(),
                   onChanged: (value) {
@@ -318,7 +333,7 @@ class _RegisterViewState extends State<RegisterView> {
 
               const SizedBox(height: 25),
 
-              // 🔥 BUTTON REGISTER UTAMA (BLUE ACCENT PREMIUM)
+              // 🔥 BUTTON REGISTER UTAMA (MURNI KE BACKEND FLASK)
               GestureDetector(
                 onTap: () async {
                   if (nama.text.isEmpty ||
@@ -336,7 +351,6 @@ class _RegisterViewState extends State<RegisterView> {
                       backgroundColor: Colors.red,
                       colorText: Colors.white,
                     );
-
                     return;
                   }
                   if (!GetUtils.isEmail(email.text.trim())) {
@@ -346,7 +360,6 @@ class _RegisterViewState extends State<RegisterView> {
                       backgroundColor: Colors.orange,
                       colorText: Colors.white,
                     );
-
                     return;
                   }
 
@@ -357,7 +370,6 @@ class _RegisterViewState extends State<RegisterView> {
                       backgroundColor: Colors.orange,
                       colorText: Colors.white,
                     );
-
                     return;
                   }
 
@@ -368,7 +380,6 @@ class _RegisterViewState extends State<RegisterView> {
                       backgroundColor: Colors.red,
                       colorText: Colors.white,
                     );
-
                     return;
                   }
                   if (int.parse(umur.text) < 10) {
@@ -378,7 +389,6 @@ class _RegisterViewState extends State<RegisterView> {
                       backgroundColor: Colors.orange,
                       colorText: Colors.white,
                     );
-
                     return;
                   }
                   if (double.parse(tinggi.text) < 100) {
@@ -386,7 +396,6 @@ class _RegisterViewState extends State<RegisterView> {
                       "Tinggi Badan Tidak Valid",
                       "Masukkan tinggi badan yang benar",
                     );
-
                     return;
                   }
                   if (double.parse(berat.text) < 20) {
@@ -394,69 +403,62 @@ class _RegisterViewState extends State<RegisterView> {
                       "Berat Badan Tidak Valid",
                       "Masukkan berat badan yang benar",
                     );
-
                     return;
                   }
 
                   try {
-                    UserCredential userCredential = await FirebaseAuth
-                        .instance
-                        .createUserWithEmailAndPassword(
-                          email: email.text.trim(),
-                          password: password.text.trim(),
-                        );
+                    // Mengirimkan semua data form langsung ke backend Flask
+                    final response = await http.post(
+                      Uri.parse("http://10.11.107.226:5000/api/register"),
+                      headers: {"Content-Type": "application/json"},
+                      body: jsonEncode({
+                        "name": nama.text,
+                        "email": email.text.trim(),
+                        "password": password.text,
+                        "age": int.parse(umur.text),
+                        "gender": selectedGender,
+                        "height": double.parse(tinggi.text),
+                        "weight": double.parse(berat.text),
+                        "activity_level": selectedActivity,
+                        "goal": selectedGoal,
+                        "health_condition": riwayatKesehatan.text,
+                      }),
+                    );
 
-                    await userCredential.user!.sendEmailVerification();
-                  } on FirebaseAuthException catch (e) {
+                    final data = jsonDecode(response.body);
+
+                    if (data["success"] == true) {
+                      Get.defaultDialog(
+                        title: "Registrasi Berhasil 🎉",
+                        middleText: "Akun Anda berhasil dibuat. Silakan login.",
+                        textConfirm: "Login Sekarang",
+                        confirmTextColor: Colors.white,
+                        onConfirm: () {
+                          Get.offAllNamed('/login');
+                        },
+                      );
+
+                      Future.delayed(const Duration(seconds: 3), () {
+                        if (Get.isDialogOpen ?? false) {
+                          Get.back();
+                        }
+                        Get.offAllNamed('/login');
+                      });
+                    } else {
+                      Get.snackbar(
+                        "Registrasi Gagal", 
+                        data["message"] ?? "Terjadi kesalahan pada server",
+                        backgroundColor: Colors.red,
+                        colorText: Colors.white,
+                      );
+                    }
+                  } catch (e) {
                     Get.snackbar(
-                      "Registrasi Gagal",
-                      e.message ?? "Terjadi kesalahan",
+                      "Koneksi Gagal",
+                      "Tidak dapat terhubung ke server backend.",
                       backgroundColor: Colors.red,
                       colorText: Colors.white,
                     );
-
-                    return;
-                  }
-
-                  final response = await http.post(
-                    Uri.parse("http://192.168.48.21:5000/api/register"),
-                    headers: {"Content-Type": "application/json"},
-                    body: jsonEncode({
-                      "name": nama.text,
-                      "email": email.text,
-                      "password": password.text,
-                      "age": int.parse(umur.text),
-                      "gender": selectedGender,
-                      "height": double.parse(tinggi.text),
-                      "weight": double.parse(berat.text),
-                      "activity_level": selectedActivity,
-                      "goal": selectedGoal,
-                    }),
-                  );
-
-                  final data = jsonDecode(response.body);
-
-                  if (data["success"] == true) {
-                    Get.defaultDialog(
-                      title: "Registrasi Berhasil 🎉",
-                      middleText:
-                          "Registrasi berhasil. Silakan cek email Anda untuk verifikasi akun sebelum login.",
-                      textConfirm: "Login Sekarang",
-                      confirmTextColor: Colors.white,
-                      onConfirm: () {
-                        Get.offAllNamed('/login');
-                      },
-                    );
-
-                    Future.delayed(const Duration(seconds: 5), () {
-                      if (Get.isDialogOpen ?? false) {
-                        Get.back();
-                      }
-
-                      Get.offAllNamed('/login');
-                    });
-                  } else {
-                    Get.snackbar("Gagal", data["message"]);
                   }
                 },
                 child: Container(
@@ -487,7 +489,7 @@ class _RegisterViewState extends State<RegisterView> {
 
               const SizedBox(height: 14),
 
-              // 🔥 TOMBOL GOOGLE REGISTRATION UTAMA (WHITE BOX OUTLINE)
+              // 🔥 TOMBOL GOOGLE REGISTRATION UTAMA
               SizedBox(
                 width: double.infinity,
                 height: 52,
@@ -513,7 +515,6 @@ class _RegisterViewState extends State<RegisterView> {
                     ),
                   ),
                   onPressed: () async {
-                    // 1. Validasi dulu apakah data tubuh & tujuan sudah diisi atau belum
                     if (umur.text.isEmpty ||
                         tinggi.text.isEmpty ||
                         berat.text.isEmpty ||
@@ -522,7 +523,7 @@ class _RegisterViewState extends State<RegisterView> {
                         selectedGoal == null) {
                       Get.snackbar(
                         "Data Belum Lengkap",
-                        "Mohon isi data fisik (Umur, Gender, TB, BB, Aktivitas, Tujuan) terlebih dahulu sebelum mendaftar dengan Google.",
+                        "Mohon isi data fisik terlebih dahulu sebelum mendaftar dengan Google.",
                         backgroundColor: Colors.orange,
                         colorText: Colors.white,
                       );
@@ -530,15 +531,11 @@ class _RegisterViewState extends State<RegisterView> {
                     }
 
                     try {
-                      // 2. Proses Google Sign-In
                       final GoogleSignIn googleSignIn = GoogleSignIn();
                       final GoogleSignInAccount? account = await googleSignIn.signIn();
 
-                      if (account == null) {
-                        return;
-                      }
+                      if (account == null) return;
 
-                      // 3. Hubungkan ke Firebase Auth
                       final GoogleSignInAuthentication googleAuth = await account.authentication;
                       final AuthCredential credential = GoogleAuthProvider.credential(
                         accessToken: googleAuth.accessToken,
@@ -549,9 +546,8 @@ class _RegisterViewState extends State<RegisterView> {
                       User? firebaseUser = userCredential.user;
 
                       if (firebaseUser != null) {
-                        // 4. Kirim gabungan data Google + Data Form Fisik ke Backend Anda
                         final response = await http.post(
-                          Uri.parse("http://192.168.48.21:5000/api/register"),
+                          Uri.parse("http://10.11.107.226:5000/api/register"),
                           headers: {"Content-Type": "application/json"},
                           body: jsonEncode({
                             "name": firebaseUser.displayName ?? account.displayName ?? "User Google",
@@ -563,12 +559,12 @@ class _RegisterViewState extends State<RegisterView> {
                             "weight": double.parse(berat.text),
                             "activity_level": selectedActivity,
                             "goal": selectedGoal,
+                            "health_condition": riwayatKesehatan.text,
                           }),
                         );
 
                         final data = jsonDecode(response.body);
 
-                        // 5. Handle respon dari backend
                         if (data["success"] == true) {
                           Get.defaultDialog(
                             title: "Registrasi Berhasil 🎉",

@@ -12,6 +12,7 @@ class WorkoutView extends StatefulWidget {
 
 class _WorkoutViewState extends State<WorkoutView> {
   String goal = "Umum";
+  String healthCondition = ""; // Tambahan variabel untuk menampung riwayat penyakit
   List<String> workouts = [];
 
   @override
@@ -23,7 +24,10 @@ class _WorkoutViewState extends State<WorkoutView> {
   Future<void> loadWorkout() async {
     final prefs = await SharedPreferences.getInstance();
     goal = prefs.getString("goal") ?? "Umum";
+    // Ambil data kondisi kesehatan dari lokal storage, default-nya kosong (sehat)
+    healthCondition = (prefs.getString("health_condition") ?? "").toLowerCase();
 
+    // 1. SET DAFTAR GERAKAN AWAL SESUAI GOAL
     if (goal == "Pembentukan Otot") {
       workouts = ["Push Up", "Squat", "Sit Up", "Lunges", "Plank"];
     } else if (goal == "Penurunan Berat Badan") {
@@ -32,10 +36,46 @@ class _WorkoutViewState extends State<WorkoutView> {
       workouts = ["Standing Stretch", "Arm Stretch", "Side Stretch", "High Knee", "Jumping Jack"];
     }
 
+    // 2. LOGIKA ASSESSMENT (FILTERING PENYAKIT/KELUHAN)
+    // Jika pengguna memiliki keluhan di lutut atau kaki bawah
+    if (healthCondition.contains("lutut") || 
+        healthCondition.contains("kaki") || 
+        healthCondition.contains("sendi bawah")) {
+      // Hapus gerakan yang terlalu membebani lutut secara ekstrem
+      workouts.remove("Squat Jump");
+      workouts.remove("Squat");
+      workouts.remove("Lunges");
+      workouts.remove("High Knee");
+    }
+
+    // Jika pengguna memiliki gangguan pernapasan, asma, atau jantung (butuh olahraga intensitas rendah)
+    if (healthCondition.contains("asma") || 
+        healthCondition.contains("napas") || 
+        healthCondition.contains("jantung") ||
+        healthCondition.contains("paru")) {
+      // Hapus gerakan kardio berintensitas tinggi/loncat yang memicu sesak
+      workouts.remove("Jumping Jack");
+      workouts.remove("Squat Jump");
+      workouts.remove("High Knee");
+    }
+
+    // Jika pengguna memiliki keluhan di bahu, tangan, atau vertigo (tidak bisa menunduk lama)
+    if (healthCondition.contains("bahu") || 
+        healthCondition.contains("tangan") || 
+        healthCondition.contains("vertigo")) {
+      workouts.remove("Push Up");
+      workouts.remove("Plank");
+    }
+
+    // 3. JIKA SEMUA GERAKAN TERHAPUS KARENA KONDISI KESEHATAN, BERIKAN ALTERNATIF GERAKAN YANG SUPER RINGAN
+    if (workouts.isEmpty) {
+      workouts = ["Standing Stretch", "Arm Stretch", "Side Stretch"];
+    }
+
     setState(() {});
   }
 
-  // 🔥 WIDGET UNTUK SUMMARY CARD GOAL
+  // 💎 WIDGET UNTUK SUMMARY CARD GOAL
   Widget goalSummaryCard() {
     return Container(
       width: double.infinity,
@@ -75,6 +115,20 @@ class _WorkoutViewState extends State<WorkoutView> {
               color: Colors.white,
             ),
           ),
+          
+          // Tambahan informasi kecil di kartu jika pengguna terdeteksi memiliki keluhan kesehatan
+          if (healthCondition.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              "⚠️ Penyesuaian medis: Gerakan disesuaikan dengan kondisi tubuh Anda.",
+              style: TextStyle(
+                color: Colors.red[900],
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -108,7 +162,7 @@ class _WorkoutViewState extends State<WorkoutView> {
             children: [
               const SizedBox(height: 20),
               
-              // 🔥 CUSTOM APP BAR (BACK BUTTON & TITLE)
+              // 💎 CUSTOM APP BAR (BACK BUTTON & TITLE)
               Row(
                 children: [
                   GestureDetector(
@@ -140,7 +194,7 @@ class _WorkoutViewState extends State<WorkoutView> {
               
               const SizedBox(height: 20),
               
-              // 🔥 TAMPILKAN SUMMARY CARD GOAL
+              // 💎 TAMPILKAN SUMMARY CARD GOAL
               goalSummaryCard(),
               
               const SizedBox(height: 20),
@@ -156,7 +210,7 @@ class _WorkoutViewState extends State<WorkoutView> {
               
               const SizedBox(height: 10),
               
-              // 🔥 LIST VIEW GERAKAN WORKOUT
+              // 💎 LIST VIEW GERAKAN WORKOUT
               Expanded(
                 child: ListView.builder(
                   itemCount: workouts.length,

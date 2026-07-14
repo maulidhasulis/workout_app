@@ -31,7 +31,7 @@ class _ProgressViewState extends State<ProgressView> {
 
     try {
       final response = await http.get(
-        Uri.parse("http://192.168.48.21:5000/api/get-progress/$userId"),
+        Uri.parse("http://10.11.107.226:5000/api/get-progress/$userId"),
       );
 
       final data = jsonDecode(response.body);

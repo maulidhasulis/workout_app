@@ -2,31 +2,34 @@ import 'package:flutter/material.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
 class PosePainter extends CustomPainter {
-
   final Pose pose;
+  final Size absoluteImageSize;
+  final InputImageRotation rotation;
 
-  PosePainter(this.pose);
+  PosePainter(this.pose, this.absoluteImageSize, this.rotation);
 
   @override
   void paint(Canvas canvas, Size size) {
-
     final pointPaint = Paint()
       ..color = Colors.red
-      ..strokeWidth = 5;
+      ..strokeWidth = 6;
 
     final linePaint = Paint()
       ..color = Colors.green
-      ..strokeWidth = 3;
+      ..strokeWidth = 4;
+
+    final double scaleX = size.width / absoluteImageSize.height;
+    final double scaleY = size.height / absoluteImageSize.width;
 
     Map<PoseLandmarkType, Offset> points = {};
 
     pose.landmarks.forEach((type, landmark) {
+      double x = landmark.x * scaleX;
+      double y = landmark.y * scaleY;
 
-      final offset = Offset(
-        landmark.x,
-        landmark.y,
-      );
+      x = size.width - x;
 
+      final offset = Offset(x, y);
       points[type] = offset;
 
       canvas.drawCircle(
@@ -34,24 +37,16 @@ class PosePainter extends CustomPainter {
         5,
         pointPaint,
       );
-
     });
 
-    void draw(
-      PoseLandmarkType a,
-      PoseLandmarkType b,
-    ) {
-
-      if(points[a]!=null && points[b]!=null){
-
+    void draw(PoseLandmarkType a, PoseLandmarkType b) {
+      if (points[a] != null && points[b] != null) {
         canvas.drawLine(
           points[a]!,
           points[b]!,
           linePaint,
         );
-
       }
-
     }
 
     draw(PoseLandmarkType.leftShoulder, PoseLandmarkType.rightShoulder);
@@ -63,7 +58,6 @@ class PosePainter extends CustomPainter {
 
     draw(PoseLandmarkType.leftShoulder, PoseLandmarkType.leftHip);
     draw(PoseLandmarkType.rightShoulder, PoseLandmarkType.rightHip);
-
     draw(PoseLandmarkType.leftHip, PoseLandmarkType.rightHip);
 
     draw(PoseLandmarkType.leftHip, PoseLandmarkType.leftKnee);
@@ -71,10 +65,10 @@ class PosePainter extends CustomPainter {
 
     draw(PoseLandmarkType.rightHip, PoseLandmarkType.rightKnee);
     draw(PoseLandmarkType.rightKnee, PoseLandmarkType.rightAnkle);
-
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
-
+  bool shouldRepaint(covariant PosePainter oldDelegate) {
+    return oldDelegate.pose != pose;
+  }
 }
