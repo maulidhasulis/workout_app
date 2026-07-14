@@ -89,12 +89,9 @@ class _CameraViewState extends State<CameraView> {
       calories += getCalories();
     });
 
-    speak("$currentRep");
-
     if (currentRep >= target && !workoutSaved) {
       workoutSaved = true;
       saveWorkout();
-      speak("Latihan selesai, data berhasil disimpan");
     }
   }
 
@@ -142,23 +139,26 @@ class _CameraViewState extends State<CameraView> {
   }
 
   void countJumpingJack(Pose pose) {
-    final leftShoulder = pose.landmarks[PoseLandmarkType.leftShoulder];
     final leftWrist = pose.landmarks[PoseLandmarkType.leftWrist];
+    final rightWrist = pose.landmarks[PoseLandmarkType.rightWrist];
     final leftAnkle = pose.landmarks[PoseLandmarkType.leftAnkle];
     final rightAnkle = pose.landmarks[PoseLandmarkType.rightAnkle];
 
-    if (leftShoulder == null || leftWrist == null || leftAnkle == null || rightAnkle == null) {
+    if (leftWrist == null || rightWrist == null || leftAnkle == null || rightAnkle == null) {
       return;
     }
 
-    bool handUp = leftWrist.y < leftShoulder.y;
-    bool legOpen = (rightAnkle.x - leftAnkle.x).abs() > 100;
+    bool handUp = leftWrist.y < 200 && rightWrist.y < 200;
+    bool legOpen = (rightAnkle.x - leftAnkle.x).abs() > 120;
 
     if (handUp && legOpen) {
       repState = true;
     }
 
-    if (!handUp && !legOpen && repState) {
+    bool handDown = leftWrist.y > 240 && rightWrist.y > 240;
+    bool legClose = (rightAnkle.x - leftAnkle.x).abs() < 90;
+
+    if (handDown && legClose && repState) {
       repState = false;
       addRep();
     }
@@ -175,7 +175,7 @@ class _CameraViewState extends State<CameraView> {
 
     double angle = calculateAngle(hip, knee, ankle);
 
-    if (angle < 100) {
+    if (angle < 95) {
       repState = true;
     }
 
@@ -239,7 +239,7 @@ class _CameraViewState extends State<CameraView> {
       repState = true;
     }
 
-    if (angle > 150 && repState) {
+    if (angle > 145 && repState) {
       repState = false;
       addRep();
     }
@@ -256,7 +256,7 @@ class _CameraViewState extends State<CameraView> {
 
     double angle = calculateAngle(hip, knee, ankle);
 
-    if (angle < 105) {
+    if (angle < 100) {
       repState = true;
     }
 
@@ -295,15 +295,14 @@ class _CameraViewState extends State<CameraView> {
   }
 
   void checkStandingStretch(Pose pose) {
-    final leftShoulder = pose.landmarks[PoseLandmarkType.leftShoulder];
     final leftWrist = pose.landmarks[PoseLandmarkType.leftWrist];
     final rightWrist = pose.landmarks[PoseLandmarkType.rightWrist];
 
-    if (leftShoulder == null || leftWrist == null || rightWrist == null) {
+    if (leftWrist == null || rightWrist == null) {
       return;
     }
 
-    if (leftWrist.y < leftShoulder.y && rightWrist.y < leftShoulder.y) {
+    if (leftWrist.y < 180 && rightWrist.y < 180) {
       if (holdStart == null) {
         holdStart = DateTime.now();
       }
@@ -328,7 +327,7 @@ class _CameraViewState extends State<CameraView> {
       return;
     }
 
-    if ((rightWrist.x - leftShoulder.x).abs() < 50) {
+    if ((rightWrist.x - leftShoulder.x).abs() < 40) {
       if (holdStart == null) {
         holdStart = DateTime.now();
       }
@@ -353,7 +352,7 @@ class _CameraViewState extends State<CameraView> {
       return;
     }
 
-    if ((shoulder.x - hip.x).abs() > 50) {
+    if ((shoulder.x - hip.x).abs() > 40) {
       if (holdStart == null) {
         holdStart = DateTime.now();
       }
@@ -386,7 +385,7 @@ class _CameraViewState extends State<CameraView> {
       cameras[cameraIndex],
       ResolutionPreset.low,
       enableAudio: false,
-      // PENTING: Lepas penguncian format, biarkan sistem kamera memilih format default terbaik perangkat
+      imageFormatGroup: ImageFormatGroup.nv21, // Format NV21 untuk Android
     );
     await controller!.initialize();
     await controller!.startImageStream(processCameraImage);
@@ -408,7 +407,7 @@ class _CameraViewState extends State<CameraView> {
     await initCamera();
   }
 
-  List<double> convertToMoveNetFormat(Pose pose, Size rawSize) {
+  List<double> convertToMoveNetFormat(Pose pose) {
     List<PoseLandmarkType> moveNetOrder = [
       PoseLandmarkType.nose,
       PoseLandmarkType.leftEye,
@@ -433,15 +432,8 @@ class _CameraViewState extends State<CameraView> {
     for (var type in moveNetOrder) {
       final landmark = pose.landmarks[type];
       if (landmark != null) {
-        double translatedX = landmark.x;
-        double translatedY = landmark.y;
-
-        if (cameraIndex == 1) {
-          translatedX = rawSize.width - translatedX;
-        }
-
-        resultPoints.add(translatedX);
-        resultPoints.add(translatedY);
+        resultPoints.add(landmark.x);
+        resultPoints.add(landmark.y);
         resultPoints.add(landmark.likelihood);
       } else {
         resultPoints.add(0.0);
@@ -452,7 +444,6 @@ class _CameraViewState extends State<CameraView> {
     return resultPoints;
   }
 
-  // AMAN DI SEMUA HP: Menggunakan konversi standar InputImage.fromCameraImage bawaan ML Kit
   void processCameraImage(CameraImage image) async {
     if (isProcessing) return;
     isProcessing = true;
@@ -460,11 +451,20 @@ class _CameraViewState extends State<CameraView> {
     try {
       final camera = cameras[cameraIndex];
       final rotation = InputImageRotationValue.fromRawValue(camera.sensorOrientation) ?? InputImageRotation.rotation0deg;
-      final format = InputImageFormatValue.fromRawValue(image.format.raw) ?? InputImageFormat.nv21;
+      
+      // Mengabaikan pembacaan format raw dari OS Oppo/Realme, paksa menggunakan NV21 standar ML Kit
+      final format = InputImageFormat.nv21;
 
-      // Membuat InputImage menggunakan metadata murni bawaan kamera sistem operasi HP
+      // PERBAIKAN FINAL: Menggabungkan seluruh data bytes dari semua bidang plane (Y + UV) 
+      // Menggunakan alokasi WriteBuffer untuk mencegah lemparan IllegalArgumentException
+      final WriteBuffer allBytes = WriteBuffer();
+      for (final Plane plane in image.planes) {
+        allBytes.putUint8List(plane.bytes);
+      }
+      final bytes = allBytes.done().buffer.asUint8List();
+
       final inputImage = InputImage.fromBytes(
-        bytes: concatPlanes(image.planes),
+        bytes: bytes,
         metadata: InputImageMetadata(
           size: Size(image.width.toDouble(), image.height.toDouble()),
           rotation: rotation,
@@ -476,11 +476,10 @@ class _CameraViewState extends State<CameraView> {
       final poses = await poseDetector.processImage(inputImage);
 
       if (poses.isNotEmpty) {
-        final currentSize = Size(image.width.toDouble(), image.height.toDouble());
         if (mounted) {
           setState(() {
             currentPose = poses.first;
-            imageSize = currentSize;
+            imageSize = Size(image.width.toDouble(), image.height.toDouble());
             imageRotation = rotation;
           });
         }
@@ -488,7 +487,7 @@ class _CameraViewState extends State<CameraView> {
         runLocalCounter(poses.first);
 
         if (!isPredicting) {
-          sendDataToAiServer(poses.first, currentSize);
+          sendDataToAiServer(poses.first);
         }
       } else {
         if (mounted) {
@@ -502,15 +501,6 @@ class _CameraViewState extends State<CameraView> {
     } finally {
       isProcessing = false;
     }
-  }
-
-  // Fungsi pembantu lintas platform untuk menyatukan buffer byte citra kamera secara aman
-  Uint8List concatPlanes(List<Plane> planes) {
-    final WriteBuffer allBytes = WriteBuffer();
-    for (final Plane plane in planes) {
-      allBytes.putUint8List(plane.bytes);
-    }
-    return allBytes.done().buffer.asUint8List();
   }
 
   void runLocalCounter(Pose pose) {
@@ -550,9 +540,9 @@ class _CameraViewState extends State<CameraView> {
     }
   }
 
-  Future<void> sendDataToAiServer(Pose pose, Size currentSize) async {
+  Future<void> sendDataToAiServer(Pose pose) async {
     isPredicting = true;
-    List<double> inputFeatures = convertToMoveNetFormat(pose, currentSize);
+    List<double> inputFeatures = convertToMoveNetFormat(pose);
 
     try {
       final response = await http.post(
