@@ -13,7 +13,7 @@ android {
     namespace = "com.example.workout_app"
 
     // Gunakan SDK 34 atau 35 terlebih dahulu jika SDK 36 dirasa terlalu eksperimental untuk beberapa library MLKit
-    compileSdk = 35
+    compileSdk = 36
 
     ndkVersion = "27.0.12077973"
 
@@ -52,4 +52,4 @@ dependencies {
 
 flutter {
     source = "../.."
-}
+}   

@@ -31,9 +31,9 @@ class _WorkoutViewState extends State<WorkoutView> {
     if (goal == "Pembentukan Otot") {
       workouts = ["Push Up", "Squat", "Sit Up", "Lunges", "Plank"];
     } else if (goal == "Penurunan Berat Badan") {
-      workouts = ["Jumping Jack", "High Knee", "Squat Jump", "Fast Squat"];
+      workouts = ["Jumping Jack", "High Knee", "Squat Jump", "Fast Squat", "Sit Up"];
     } else {
-      workouts = ["Standing Stretch", "Arm Stretch", "Side Stretch", "High Knee", "Jumping Jack"];
+      workouts = ["Standing Stretch", "Arm Stretch", "Side Stretch", "High Knee", "Jumping Jack", "Sit Up"];
     }
 
     // 2. LOGIKA ASSESSMENT (FILTERING PENYAKIT/KELUHAN)
