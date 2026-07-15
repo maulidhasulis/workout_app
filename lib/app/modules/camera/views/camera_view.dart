@@ -53,8 +53,8 @@ class _CameraViewState extends State<CameraView> {
   String exercise = "";
   int target = 15;
   String coachText = "";
-  String detectedExercise = "-";
-  double confidence = 0;
+  // String detectedExercise = "-";
+  // double confidence = 0;
   int currentRep = 0;
   double calories = 0;
   final FlutterTts tts = FlutterTts();
@@ -68,7 +68,7 @@ class _CameraViewState extends State<CameraView> {
   Pose? currentPose;
   bool repState = false;
   int frameCount = 0;
-  bool isPredicting = false;
+  // bool isPredicting = false;
   int holdSeconds = 0;
   bool workoutSaved = false;
   DateTime? holdStart;
@@ -148,16 +148,37 @@ class _CameraViewState extends State<CameraView> {
       return;
     }
 
-    bool handUp = leftWrist.y < 200 && rightWrist.y < 200;
-    bool legOpen = (rightAnkle.x - leftAnkle.x).abs() > 120;
+    final leftShoulder =
+    pose.landmarks[PoseLandmarkType.leftShoulder];
 
+    final rightShoulder =
+    pose.landmarks[PoseLandmarkType.rightShoulder];
+
+    if(leftShoulder==null||rightShoulder==null){
+    return;
+    }
+
+    bool handUp =
+    leftWrist.y < leftShoulder.y &&
+    rightWrist.y < rightShoulder.y;
+    final hipWidth =
+    (pose.landmarks[PoseLandmarkType.rightHip]!.x-
+    pose.landmarks[PoseLandmarkType.leftHip]!.x).abs();
+
+    bool legOpen =
+    (rightAnkle.x-leftAnkle.x).abs() >
+    hipWidth*1.6;
     if (handUp && legOpen) {
       repState = true;
     }
 
-    bool handDown = leftWrist.y > 240 && rightWrist.y > 240;
-    bool legClose = (rightAnkle.x - leftAnkle.x).abs() < 90;
-
+    bool handDown =
+    leftWrist.y > leftShoulder.y &&
+    rightWrist.y > rightShoulder.y;    
+    bool legClose =
+    (rightAnkle.x-leftAnkle.x).abs() <
+    hipWidth*1.2;
+    
     if (handDown && legClose && repState) {
       repState = false;
       addRep();
@@ -486,9 +507,6 @@ class _CameraViewState extends State<CameraView> {
 
         runLocalCounter(poses.first);
 
-        if (!isPredicting) {
-          sendDataToAiServer(poses.first);
-        }
       } else {
         if (mounted) {
           setState(() {
@@ -540,35 +558,6 @@ class _CameraViewState extends State<CameraView> {
     }
   }
 
-  Future<void> sendDataToAiServer(Pose pose) async {
-    isPredicting = true;
-    List<double> inputFeatures = convertToMoveNetFormat(pose);
-
-    try {
-      final response = await http.post(
-        Uri.parse("http://10.11.107.226:5000/api/predict"),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({
-          "keypoints": inputFeatures,
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        final result = jsonDecode(response.body);
-        if (result["success"] == true && mounted) {
-          setState(() {
-            detectedExercise = result["exercise"];
-            confidence = result["confidence"];
-          });
-        }
-      }
-    } catch (e) {
-      print("Gagal terhubung ke AI server: $e");
-    } finally {
-      isPredicting = false;
-    }
-  }
-
   @override
   void dispose() {
     controller?.dispose();
@@ -581,7 +570,7 @@ class _CameraViewState extends State<CameraView> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Deteksi AI: $exercise"),
+        title: Text(exercise),        
         backgroundColor: Colors.blueAccent,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -640,14 +629,6 @@ class _CameraViewState extends State<CameraView> {
                         ),
                       ),
                       const SizedBox(height: 10),
-                      Text(
-                        "Klasifikasi AI Server: $detectedExercise (${(confidence * 100).toStringAsFixed(0)}%)",
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Colors.blue,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
                     ],
                   ),
                 ),
